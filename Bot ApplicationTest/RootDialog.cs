@@ -27,7 +27,15 @@ namespace Bot_ApplicationTest
         public virtual async Task MessageReceivedAsync(IDialogContext context, IAwaitable<IMessageActivity> result)
         {
             var message = await result;
-            PromptDialog.Choice(context, ResumeAfter, new List<string> { "Option 1", "Option 2" }, "Hello! Choisissez une option!");
+            // PromptDialog.Choice(context, ResumeAfter, new List<string> { "Option 1", "Option 2" }, "Hello! Comment vas-tu ajourd'hui!");
+            PromptDialog.Text(context, IGotAnAnswer, "Hello! How are you doing today!", $"Please say something ...");
+        }
+
+        private async Task IGotAnAnswer(IDialogContext context, IAwaitable<string> result)
+        {
+            var message = await result;
+            await context.PostAsync($"It's good to hear that you're feeling {message}");
+            context.Wait(MessageReceivedAsync);
         }
 
         private async Task ResumeAfter(IDialogContext context, IAwaitable<string> result)
