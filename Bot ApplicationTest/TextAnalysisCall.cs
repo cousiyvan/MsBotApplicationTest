@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 [Serializable]
 // Classes to store the input for the sentiment API call
-public class SentimentInput
+public class TextInput
 {
     public List<DocumentInput> documents { get; set; }
 }
