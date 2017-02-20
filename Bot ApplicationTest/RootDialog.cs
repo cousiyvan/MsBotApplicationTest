@@ -19,6 +19,11 @@ namespace Bot_ApplicationTest
     [Serializable]
     public class RootDialog : IDialog<string>
     {
+        #region constants
+        private const string OPTION_YOUTUBE = "Youtube random vidéo?";
+        private const string OPTION_DISCUSS = "Simply discuss?";
+        #endregion
+
         CognitiveServiceCall sentimentServiceCall;
         CognitiveServiceCall keyPhrasesServiceCall;
 
@@ -40,8 +45,27 @@ namespace Bot_ApplicationTest
         public virtual async Task MessageReceivedAsync(IDialogContext context, IAwaitable<IMessageActivity> result)
         {
             var message = await result;
-            // PromptDialog.Choice(context, ResumeAfter, new List<string> { "Option 1", "Option 2" }, "Hello! Comment vas-tu ajourd'hui!");
-            PromptDialog.Text(context, IGotAnAnswer, "Hello! How are you doing today!", $"Please say something ...");
+            PromptDialog.Choice(context, ResumeAfter, new List<string> { $"{OPTION_YOUTUBE}", $"{OPTION_DISCUSS}" }, "Hello! What would you like today?");
+        }
+
+        private async Task ResumeAfter(IDialogContext context, IAwaitable<string> result)
+        {
+            var message = await result;
+
+            if (message == $"{OPTION_YOUTUBE}")
+            {
+                await context.PostAsync($"Good Choice :D");
+                PromptDialog.Text(context, YouTubeRandom, "What kind of vidéo you like (topics separated by space)", $"Please say something ...");
+            }
+            else if (message == $"{OPTION_DISCUSS}")
+            {
+                await context.PostAsync($"Need some chit chat? ^^ ");
+                PromptDialog.Text(context, IGotAnAnswer, "So ... How are you doint today?", $"Please say something ...");
+            }
+            else
+            {
+                context.Wait(MessageReceivedAsync);
+            }
         }
 
         private async Task IGotAnAnswer(IDialogContext context, IAwaitable<string> result)
@@ -87,12 +111,22 @@ namespace Bot_ApplicationTest
 
             string myTopics = WhatAreYourTopics(jsonResponseKeyPhrases, moodLevel);
 
-            string youtubeLink = this.LinkYoutube(new List<string> { "Jeux", "people" });
+            // We go on with the text answered
+            // PromptDialog.Text(context, IGotAnAnswer, $"{myTopics}", $"Please say something ...");
+            await context.PostAsync($"{myTopics}");
+
+            // start back
+            context.Wait(MessageReceivedAsync);
+        }
+
+        private async Task YouTubeRandom(IDialogContext context, IAwaitable<string> result)
+        {
+            var message = await result;
+            string youtubeLink = this.LinkYoutube(message.Split(' ').ToList());
             await context.PostAsync($"Your daily youtube link {youtubeLink}");
 
-            // We go on with the text answered
-            PromptDialog.Text(context, IGotAnAnswer, $"{myTopics}", $"Please say something ...");
-            // context.Wait(MessageReceivedAsync);
+            // Start back from the beginning
+            context.Wait(MessageReceivedAsync);
         }
 
         private string WhatIsYourMood(BatchResult sentiment, out double moodLevel)
@@ -186,25 +220,6 @@ namespace Bot_ApplicationTest
                 return false;
         }
 
-        private async Task ResumeAfter(IDialogContext context, IAwaitable<string> result)
-        {
-            var message = await result;
-            await context.PostAsync($"Vous avez choisi l'option {message}");
-
-            if (message == "Option 1")
-            {
-                context.Call(new RootDialog(), ResumeAfter);
-            }
-            else if (message == "Option 2")
-            {
-                context.Call(new RootDialog(), ResumeAfter);
-            }
-            else
-            {
-                context.Wait(MessageReceivedAsync);
-            }
-        }
-
         private string LinkYoutube(List<string> searchTerms)
         {
             string youtubeLink = ConfigurationManager.AppSettings["YoutubeLink"];
@@ -216,7 +231,7 @@ namespace Bot_ApplicationTest
             });
 
             var searchList = youTubeService.Search.List("snippet");
-            searchTerms.ForEach(x => searchList.Q += $"{x} ");
+            searchTerms.ForEach(x => searchList.Q += $"{HttpUtility.UrlEncode(x)}{HttpUtility.UrlEncode(" ")}");
             searchList.MaxResults = 5;
             searchList.PublishedAfter = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0 ,0);
             searchList.Type = "video";
